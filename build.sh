@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 function _help(){
     echo
@@ -182,6 +182,19 @@ function _build(){
             DEBUG=0
         fi
 
+        # TF-A expects the assembler to be GCC (not a bare assembler like `as`),
+        # because its build rules pass `-x assembler-with-cpp` which is a GCC flag.
+        # Unset any pre-existing `AS` from the environment (e.g. the Nix GCC
+        # wrapper) so TF-A derives the assembler from the C compiler instead.
+        unset AS
+
+        # GCC 15 added -Werror=unterminated-string-initialization which breaks
+        # the build on some Rockchip SCMI code where a domain name exceeds the
+        # SCMI-specified 16-byte limit.  Setting TF_CFLAGS via the environment
+        # (rather than on the command line) lets the Makefile's `+=` append its
+        # own flags (include paths, -Werror, etc.) after this suppression.
+        export TF_CFLAGS="${TF_CFLAGS} -Wno-error=unterminated-string-initialization"
+
         make PLAT=${TFA_PLAT} DEBUG=${DEBUG} all ${TFA_FLAGS}
 
         popd
@@ -208,6 +221,26 @@ function _build(){
 
     make -C "${ROOTDIR}/edk2/BaseTools"
     source "${ROOTDIR}/edk2/edksetup.sh"
+
+    # GCC 15 defaults to C23 where `bool` is a keyword, breaking
+    # `typedef BOOLEAN bool;` in edk2-rockchip headers.  Pin to gnu17.
+    # Also: Nix's GCC wrapper injects -Wformat-security via its hardening
+    # flags; EDK2's OpenSSL build disables -Wformat with -Wno-format, which
+    # makes -Wformat-security a useless flag that GCC 15 errors on under
+    # -Werror.  Add -Wno-error=format-security to catch both cases.
+    # shellcheck disable=SC2016
+    sed -i '/^DEFINE GCC_ALL_CC_FLAGS/ s/$/ -std=gnu17 -Wno-error=format-security/' \
+        "${WORKSPACE}/Conf/tools_def.txt"
+
+    # OpensslLib.inf overrides the default AARCH64 toolchain flags, so the
+    # above GCC_ALL_CC_FLAGS fix doesn't reach it.  Patch its AARCH64 flags
+    # directly to suppress the same -Wformat-security issue.
+    if [ -f "${ROOTDIR}/edk2/CryptoPkg/Library/OpensslLib/OpensslLib.inf" ]; then
+        if ! grep -q 'format-security' "${ROOTDIR}/edk2/CryptoPkg/Library/OpensslLib/OpensslLib.inf"; then
+            sed -i 's/\(GCC:\*_\*_AARCH64_CC_FLAGS.*\)-Wno-error=format/\1-Wno-error=format-security -Wno-error=format/' \
+                "${ROOTDIR}/edk2/CryptoPkg/Library/OpensslLib/OpensslLib.inf"
+        fi
+    fi
 
     build \
         -s \
