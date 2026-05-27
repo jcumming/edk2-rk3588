@@ -41,15 +41,9 @@
           # packages.default = pkgs.hello;
 
           devShells.default = pkgs.mkShell {
-            # GCC 15 defaults to C23 (breaks `typedef BOOLEAN bool;`) and adds
-            # -Wunterminated-string-initialization (SCMI domain name length).
-            # Pin to GCC 14 which matches what Debian/Ubuntu ship for this
-            # project and avoids these regressions.
             packages = with pkgs; [
-              gcc14
-            ];
-            nativeBuildInputs = with pkgs; [
               gnumake
+              gcc14
               python3
               python3Packages.pyelftools # for FIT image generation (extractbl31.py)
               util-linux # for uuid/uuid.h
