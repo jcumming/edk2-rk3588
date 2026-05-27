@@ -229,7 +229,11 @@ function _build(){
     # makes -Wformat-security a useless flag that GCC 15 errors on under
     # -Werror.  Add -Wno-error=format-security to catch both cases.
     # shellcheck disable=SC2016
-    sed -i '/^DEFINE GCC_ALL_CC_FLAGS/ s/$/ -std=gnu17 -Wno-error=format-security/' \
+    # The tools_def.template has CRLF (\r\n) line endings.  Python's text-mode
+    # readlines() treats standalone \r as a newline (universal newline mode),
+    # so appending with s/$/ puts the flags after the \r where they get split
+    # off as a separate unparseable line.  Strip \r first, then append.
+    sed -i 's/\r//g; /^DEFINE GCC_ALL_CC_FLAGS/ s/$/ -std=gnu17 -Wno-error=format-security/' \
         "${WORKSPACE}/Conf/tools_def.txt"
 
     # OpensslLib.inf overrides the default AARCH64 toolchain flags, so the
