@@ -1,3 +1,16 @@
+# Nix notes:
+
+```
+$ nix develop .#devShells.aarch64-linux.default --command ./build.sh --device rock-5bplus --release Release
+```
+
+Make sure the devicetree submodule is at least on v6.17. 
+
+```
+ 5b650c7a338755d8e2ba6b56e8d895bf85f8c300 devicetree/mainline/upstream (v6.17-rc1-dts)
+```
+
+
 # EDK2 UEFI firmware for Rockchip RK3588 platforms
 This repository contains an UEFI firmware implementation based on EDK2 for various RK3588 boards.
 
